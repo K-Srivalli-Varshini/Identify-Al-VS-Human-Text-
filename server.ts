@@ -8,10 +8,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const isNetlify = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
-console.log(`[DEBUG] Environment: NODE_ENV=${process.env.NODE_ENV}, isNetlify=${isNetlify}`);
-const dbPath = isNetlify ? ":memory:" : path.join(process.cwd(), "history.db");
-const db = new Database(dbPath);
+// Handle SQLite gracefully for Vercel (Read-only filesystem)
+let db: any;
+const isVercel = process.env.VERCEL === '1';
+
+try {
+  const dbPath = isVercel ? ":memory:" : path.join(process.cwd(), "history.db");
+  db = new Database(dbPath);
+  
+  if (isVercel) {
+    console.log("[INFO] Running on Vercel: Using In-Memory Database");
+  }
+} catch (err) {
+  console.error("[ERROR] Failed to initialize database, using in-memory fallback:", err);
+  db = new Database(":memory:");
+}
 
 // Initialize Database
 db.exec(`
@@ -39,11 +50,12 @@ const addLog = (level: string, message: string) => {
 
 export async function createApp() {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", environment: process.env.NODE_ENV, isNetlify });
+    res.json({ status: "ok", environment: process.env.NODE_ENV });
   });
 
   app.get("/api/history", (req, res) => {
@@ -83,7 +95,10 @@ export async function createApp() {
     
     if (!apiKey || apiKey.trim() === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
       isSimulationMode = true;
+      console.warn("[WARN] GEMINI_API_KEY not found or placeholder. Using Simulation Mode.");
       addLog("WARNING", "GEMINI_API_KEY not found. Entering Simulation Mode for demonstration.");
+    } else {
+      console.log(`[INFO] Using API Key: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`);
     }
 
     addLog("INFO", `User Input Received. ${isSimulationMode ? 'Running Local Simulation' : 'Running AI Analysis'}`);
@@ -184,13 +199,15 @@ export async function createApp() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    console.log("[INFO] Starting in DEVELOPMENT mode with Vite middleware");
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else if (!isNetlify) {
+  } else {
+    console.log("[INFO] Starting in PRODUCTION mode serving static files");
     app.use(express.static(path.join(process.cwd(), "dist")));
     app.get("*", (req, res) => {
       res.sendFile(path.join(process.cwd(), "dist", "index.html"));
@@ -200,11 +217,15 @@ export async function createApp() {
   return app;
 }
 
-if (process.env.NODE_ENV !== 'test' && !isNetlify) {
+// Only start the server if this file is run directly (not imported as a module)
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   createApp().then(app => {
-    const PORT = Number(process.env.PORT) || 3000;
+    const PORT = 3000;
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[INFO] Server running on http://localhost:${PORT}`);
+      console.log(`[INFO] Server listening on 0.0.0.0:${PORT}`);
+      console.log(`[INFO] Health check available at http://localhost:${PORT}/api/health`);
     });
+  }).catch(err => {
+    console.error("[FATAL] Failed to start server:", err);
   });
 }

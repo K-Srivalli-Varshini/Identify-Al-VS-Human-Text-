@@ -223,6 +223,14 @@ export default function App() {
     setIsAnalyzing(true);
     setLastResult(null); 
     
+    const clickLog: LogEntry = {
+      id: Date.now(),
+      timestamp: new Date().toLocaleTimeString(),
+      level: 'info',
+      message: 'Analyze button clicked. Preparing request...',
+    };
+    setLogs(prev => [clickLog, ...prev]);
+    
     // Add user message to chat history
     setChatMessages(prev => [...prev, { role: 'user', content: text.substring(0, 100) + (text.length > 100 ? '...' : '') }]);
 
