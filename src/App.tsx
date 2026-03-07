@@ -188,8 +188,12 @@ export default function App() {
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   const checkApiHealth = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     try {
-      const res = await fetch('/api/health');
+      const res = await fetch('/api/health', { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         setApiStatus('online');
@@ -197,9 +201,10 @@ export default function App() {
       } else {
         setApiStatus('offline');
       }
-    } catch (err) {
+    } catch (err: any) {
+      clearTimeout(timeoutId);
       setApiStatus('offline');
-      console.error('API Health Check Failed:', err);
+      console.error('API Health Check Failed:', err.name === 'AbortError' ? 'Timeout' : err);
     }
   };
 

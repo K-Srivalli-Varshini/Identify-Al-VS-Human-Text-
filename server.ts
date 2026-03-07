@@ -8,23 +8,27 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+console.log("[DEBUG] Initializing Database...");
 // Handle SQLite gracefully for Vercel (Read-only filesystem)
 let db: any;
 const isVercel = process.env.VERCEL === '1';
 
 try {
   const dbPath = isVercel ? ":memory:" : path.join(process.cwd(), "history.db");
+  console.log(`[DEBUG] Database path: ${dbPath}`);
   db = new Database(dbPath);
   
   if (isVercel) {
     console.log("[INFO] Running on Vercel: Using In-Memory Database");
   }
+  console.log("[DEBUG] Database initialized successfully.");
 } catch (err) {
   console.error("[ERROR] Failed to initialize database, using in-memory fallback:", err);
   db = new Database(":memory:");
 }
 
 // Initialize Database
+console.log("[DEBUG] Running database migrations...");
 db.exec(`
   CREATE TABLE IF NOT EXISTS history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +45,7 @@ db.exec(`
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+console.log("[DEBUG] Database migrations completed.");
 
 const addLog = (level: string, message: string) => {
   const stmt = db.prepare("INSERT INTO logs (level, message) VALUES (?, ?)");
@@ -49,13 +54,16 @@ const addLog = (level: string, message: string) => {
 };
 
 export async function createApp() {
+  console.log("[DEBUG] Creating Express app...");
   const app = express();
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // API Routes
+  console.log("[DEBUG] Registering API routes...");
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", environment: process.env.NODE_ENV });
+    console.log("[DEBUG] GET /api/health called");
+    res.json({ status: "ok", environment: process.env.NODE_ENV, vercel: !!process.env.VERCEL });
   });
 
   app.get("/api/history", (req, res) => {
@@ -218,7 +226,8 @@ export async function createApp() {
 }
 
 // Only start the server if this file is run directly (not imported as a module)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+// In AI Studio, we always want to listen on port 3000.
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL || process.env.AISTUDIO_ENVIRONMENT) {
   createApp().then(app => {
     const PORT = 3000;
     app.listen(PORT, "0.0.0.0", () => {
