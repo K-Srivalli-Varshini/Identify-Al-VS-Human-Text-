@@ -4,8 +4,13 @@ import Database from "better-sqlite3";
 import { GoogleGenAI } from "@google/genai";
 import path from "path";
 import "dotenv/config";
+import { fileURLToPath } from 'url';
 
-const db = new Database("history.db");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const dbPath = path.join(__dirname, "history.db");
+const db = new Database(dbPath);
 
 // Initialize Database
 db.exec(`
@@ -130,14 +135,29 @@ async function startServer() {
             ]
           }
           
-          Text: "${text.substring(0, 3000)}"`,
+          Text: """${text.substring(0, 3000).replace(/"/g, "'")}"""`,
           config: {
             responseMimeType: "application/json"
           }
         });
 
         const response = await genModel;
-        result = JSON.parse(response.text || "{}");
+        const textResponse = response.text;
+        
+        if (!textResponse) {
+          throw new Error("Empty response from AI model");
+        }
+
+        try {
+          result = JSON.parse(textResponse);
+        } catch (parseError) {
+          addLog("ERROR", `JSON Parse Error: ${textResponse}`);
+          throw new Error("Failed to parse AI model response as JSON");
+        }
+
+        if (!result.prediction || typeof result.confidence !== 'number') {
+          throw new Error("Invalid response format from AI model");
+        }
       }
 
       const stmt = db.prepare("INSERT INTO history (text, prediction, confidence, model) VALUES (?, ?, ?, ?)");

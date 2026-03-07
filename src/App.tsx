@@ -196,19 +196,24 @@ export default function App() {
 
     const text = inputText;
     setIsAnalyzing(true);
-    setLastResult(null); // Clear previous result
+    setLastResult(null); 
     
     // Add user message to chat history
     setChatMessages(prev => [...prev, { role: 'user', content: text.substring(0, 100) + (text.length > 100 ? '...' : '') }]);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
     try {
       console.log(`Starting analysis with model: ${selectedModel}`);
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, model: selectedModel })
+        body: JSON.stringify({ text, model: selectedModel }),
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       if (!res.ok) {
@@ -239,11 +244,20 @@ export default function App() {
       }, 100);
 
     } catch (err: any) {
-      console.error('Network error during analysis:', err);
-      setChatMessages(prev => [...prev, { 
-        role: 'system', 
-        content: `Network Error: ${err.message || 'Failed to connect to the analysis server.'}` 
-      }]);
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        console.error('Analysis timed out');
+        setChatMessages(prev => [...prev, { 
+          role: 'system', 
+          content: 'Error: Analysis timed out after 30 seconds. Please try again with shorter text.' 
+        }]);
+      } else {
+        console.error('Network error during analysis:', err);
+        setChatMessages(prev => [...prev, { 
+          role: 'system', 
+          content: `Network Error: ${err.message || 'Failed to connect to the analysis server.'}` 
+        }]);
+      }
     } finally {
       setIsAnalyzing(false);
     }
