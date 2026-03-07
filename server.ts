@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import { GoogleGenAI } from "@google/genai";
 import path from "path";
@@ -178,6 +177,7 @@ export async function createApp() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
