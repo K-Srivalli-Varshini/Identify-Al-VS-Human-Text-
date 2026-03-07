@@ -327,7 +327,7 @@ export default function App() {
             <div className="p-2 bg-indigo-600 rounded-xl text-white">
               <BrainCircuit className="w-6 h-6" />
             </div>
-            <h1 className="font-black text-2xl tracking-tighter text-slate-900">SENTINEL</h1>
+            <h1 className="font-black text-2xl tracking-tighter text-slate-900">VERIFY AI</h1>
           </div>
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mt-2 font-bold">Text Authenticity Lab</p>
         </div>
@@ -437,10 +437,10 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                   <div className="space-y-6">
                     <h1 className="text-6xl font-black text-slate-900 leading-[0.9] tracking-tighter">
-                      UNMASK THE <span className="text-indigo-600">MACHINE.</span>
+                      AI VS HUMAN <span className="text-indigo-600">TEXT IDENTIFICATION</span>
                     </h1>
                     <p className="text-xl text-slate-500 leading-relaxed font-medium">
-                      The industry standard for AI content verification. Detect GPT-4, Gemini, and Claude patterns with 99.8% accuracy.
+                      Advanced forensic analysis to distinguish between synthetic AI generation and authentic human authorship.
                     </p>
                     <div className="flex gap-4">
                       <button 
@@ -1511,22 +1511,46 @@ function StatRow({ label, value }: { label: string, value: string }) {
 
 function ModelCard({ name, accuracy, latency, strength, selected, onClick }: { name: string, accuracy: string, latency: string, strength: string, selected: boolean, onClick: () => void }) {
   return (
-    <button 
+    <motion.button 
       onClick={onClick}
-      className={`w-full p-6 rounded-[1.5rem] border text-left transition-all ${
+      whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      initial={false}
+      animate={{ 
+        scale: selected ? 1.02 : 1,
+        boxShadow: selected ? "0 20px 25px -5px rgb(79 70 229 / 0.2), 0 8px 10px -6px rgb(79 70 229 / 0.2)" : "0 1px 3px 0 rgb(0 0 0 / 0.1)",
+      }}
+      className={`w-full p-6 rounded-[1.5rem] border text-left transition-colors duration-300 relative overflow-hidden ${
         selected 
-          ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-200' 
+          ? 'bg-indigo-600 border-indigo-600 text-white ring-4 ring-indigo-600/20' 
           : 'bg-white border-slate-200 text-slate-800 hover:border-indigo-300'
       }`}
     >
-      <div className="flex justify-between items-start mb-4">
+      {selected && (
+        <motion.div 
+          layoutId="active-glow"
+          className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+      <div className="flex justify-between items-start mb-4 relative z-10">
         <div className="space-y-1">
           <h4 className="font-bold">{name}</h4>
           <p className={`text-[10px] font-black uppercase tracking-widest ${selected ? 'text-indigo-200' : 'text-slate-400'}`}>{strength}</p>
         </div>
-        {selected && <CheckCircle2 size={20} />}
+        {selected && (
+          <motion.div
+            initial={{ scale: 0, rotate: -45 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 15 }}
+          >
+            <CheckCircle2 size={20} />
+          </motion.div>
+        )}
       </div>
-      <div className="flex gap-4">
+      <div className="flex gap-4 relative z-10">
         <div className="space-y-0.5">
           <p className={`text-[10px] font-bold uppercase ${selected ? 'text-indigo-200' : 'text-slate-400'}`}>Accuracy</p>
           <p className="text-sm font-black">{accuracy}</p>
@@ -1536,6 +1560,6 @@ function ModelCard({ name, accuracy, latency, strength, selected, onClick }: { n
           <p className="text-sm font-black">{latency}</p>
         </div>
       </div>
-    </button>
+    </motion.button>
   );
 }
