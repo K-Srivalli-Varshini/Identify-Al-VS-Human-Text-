@@ -217,7 +217,16 @@ export default function App() {
       });
       
       clearTimeout(timeoutId);
-      const data = await res.json();
+      
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const textResponse = await res.text();
+        console.error('Non-JSON response received:', textResponse);
+        throw new Error(`Server returned non-JSON response (${res.status}). Check logs for details.`);
+      }
 
       if (!res.ok) {
         console.error('Analysis API error:', data);
