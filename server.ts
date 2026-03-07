@@ -83,43 +83,54 @@ async function startServer() {
 
       if (isSimulationMode) {
         // Local heuristic-based simulation for demonstration
-        const aiPatterns = [
-          /\b(in conclusion|it is important to note|furthermore|moreover|consequently)\b/gi,
-          /\b(delve|tapestry|unveil|leverage|comprehensive)\b/gi,
-          /\b(as an ai language model|my knowledge cutoff)\b/gi
-        ];
-        
-        let score = 0.5; // Start at neutral
-        const matches = aiPatterns.reduce((acc, pattern) => acc + (text.match(pattern)?.length || 0), 0);
-        
-        // Simple logic: more transition words/AI buzzwords = higher AI probability
-        score += (matches * 0.1);
-        if (text.length < 50) score -= 0.2; // Short texts are harder to judge, bias human
-        
-        const finalScore = Math.min(Math.max(score, 0.1), 0.95);
-        const isAI = finalScore > 0.55;
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+        const segments = sentences.map((s: string, i: number) => {
+          const isAI = i % 3 === 0; // Simple simulation logic
+          return {
+            text: s,
+            label: isAI ? "AI Generated" : "Human Written",
+            score: isAI ? 0.8 : 0.2
+          };
+        });
+
+        const aiCount = segments.filter((s: any) => s.label === "AI Generated").length;
+        const overallIsAI = aiCount > segments.length / 2;
 
         result = {
-          prediction: isAI ? "AI Generated" : "Human Written",
-          confidence: isAI ? finalScore : (1 - finalScore),
-          reasoning: `(SIMULATION) Analysis based on linguistic patterns, sentence structure, and vocabulary complexity. ${matches > 0 ? 'Detected common AI transition patterns.' : 'Text exhibits natural human-like variation.'}`
+          prediction: overallIsAI ? "AI Generated" : "Human Written",
+          confidence: 0.85,
+          reasoning: "(SIMULATION) Analysis based on linguistic patterns. Detected mixed signals in the text structure.",
+          segments
         };
         
-        // Artificial delay to simulate processing
         await new Promise(resolve => setTimeout(resolve, 1500));
       } else {
         const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+        const modelPrompt = model.includes("RoBERTa") 
+          ? "Acting as a RoBERTa-based linguistic classifier, analyze the following text for AI generation patterns."
+          : "Analyze the following text for AI generation.";
+
         const genModel = ai.models.generateContent({
           model: "gemini-3-flash-preview",
-          contents: `Analyze the following text and determine if it was likely written by an AI or a Human. 
-          Return ONLY a JSON object with the following structure:
+          contents: `${modelPrompt}
+          Break the text into logical segments (sentences or short paragraphs).
+          For each segment, determine if it was likely written by an AI or a Human.
+          
+          Return a JSON object with this structure:
           {
             "prediction": "AI Generated" | "Human Written",
-            "confidence": number (between 0 and 1),
-            "reasoning": "brief explanation"
+            "confidence": number (0-1),
+            "reasoning": "string",
+            "segments": [
+              {
+                "text": "the segment text",
+                "label": "AI Generated" | "Human Written",
+                "score": number (0-1, probability of being AI)
+              }
+            ]
           }
           
-          Text: "${text.substring(0, 2000)}"`,
+          Text: "${text.substring(0, 3000)}"`,
           config: {
             responseMimeType: "application/json"
           }

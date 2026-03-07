@@ -21,6 +21,11 @@ export interface AnalysisResult {
   timestamp: string;
   model: string;
   isSimulation?: boolean;
+  segments?: {
+    text: string;
+    label: string;
+    score: number;
+  }[];
 }
 
 export type ViewType = 'home' | 'detection' | 'models' | 'history' | 'logs' | 'stats' | 'workflow';

@@ -189,16 +189,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const resultsRef = useRef<HTMLDivElement>(null);
+
   const handleAnalyze = async () => {
     if (!inputText.trim()) return;
 
     const text = inputText;
     setIsAnalyzing(true);
+    setLastResult(null); // Clear previous result
     
     // Add user message to chat history
     setChatMessages(prev => [...prev, { role: 'user', content: text.substring(0, 100) + (text.length > 100 ? '...' : '') }]);
 
     try {
+      console.log(`Starting analysis with model: ${selectedModel}`);
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,6 +212,7 @@ export default function App() {
       const data = await res.json();
 
       if (!res.ok) {
+        console.error('Analysis API error:', data);
         setChatMessages(prev => [...prev, { 
           role: 'system', 
           content: `Error: ${data.details || data.error || 'Analysis failed'}` 
@@ -227,10 +232,17 @@ export default function App() {
       
       fetchHistory();
       fetchLogs();
-    } catch (err) {
+
+      // Scroll to results after a short delay to allow rendering
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+
+    } catch (err: any) {
+      console.error('Network error during analysis:', err);
       setChatMessages(prev => [...prev, { 
         role: 'system', 
-        content: 'Network Error: Failed to connect to the analysis server.' 
+        content: `Network Error: ${err.message || 'Failed to connect to the analysis server.'}` 
       }]);
     } finally {
       setIsAnalyzing(false);
@@ -569,6 +581,7 @@ export default function App() {
                 {/* Results Section */}
                 {lastResult && (
                   <motion.div 
+                    ref={resultsRef}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="grid grid-cols-1 lg:grid-cols-3 gap-8"
@@ -580,21 +593,40 @@ export default function App() {
                         <h3 className="font-bold text-slate-800">Forensic Highlights</h3>
                       </div>
                       <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 min-h-[200px] text-sm leading-relaxed text-slate-700">
-                        {inputText.split(' ').map((word, i) => {
-                          const isSuspicious = lastResult.prediction === 'AI Generated' && i % 7 === 0;
-                          return (
-                            <span key={i} className={isSuspicious ? 'bg-amber-200/50 rounded px-0.5' : ''}>
-                              {word}{' '}
-                            </span>
-                          );
-                        })}
+                        {lastResult.segments ? (
+                          lastResult.segments.map((segment, i) => {
+                            const isAI = segment.label === 'AI Generated';
+                            return (
+                              <span 
+                                key={i} 
+                                className={`rounded px-1 py-0.5 transition-colors duration-500 ${
+                                  isAI 
+                                    ? 'bg-rose-100 text-rose-800 border-b-2 border-rose-300' 
+                                    : 'bg-emerald-100 text-emerald-800 border-b-2 border-emerald-300'
+                                }`}
+                                title={`${segment.label} (${(segment.score * 100).toFixed(0)}%)`}
+                              >
+                                {segment.text}{' '}
+                              </span>
+                            );
+                          })
+                        ) : (
+                          inputText.split(' ').map((word, i) => {
+                            const isSuspicious = lastResult.prediction === 'AI Generated' && i % 7 === 0;
+                            return (
+                              <span key={i} className={isSuspicious ? 'bg-rose-100/50 rounded px-0.5' : ''}>
+                                {word}{' '}
+                              </span>
+                            );
+                          })
+                        )}
                       </div>
                       <div className="flex gap-4">
                         <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase">
-                          <div className="w-3 h-3 bg-amber-200 rounded" /> Likely AI Pattern
+                          <div className="w-3 h-3 bg-rose-200 rounded" /> AI Generated
                         </div>
                         <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase">
-                          <div className="w-3 h-3 bg-slate-200 rounded" /> Neutral Text
+                          <div className="w-3 h-3 bg-emerald-200 rounded" /> Human Written
                         </div>
                       </div>
                     </div>
