@@ -9,7 +9,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, "history.db");
+const isNetlify = !!process.env.NETLIFY;
+const dbPath = isNetlify ? ":memory:" : path.join(__dirname, "history.db");
 const db = new Database(dbPath);
 
 // Initialize Database
@@ -36,10 +37,8 @@ const addLog = (level: string, message: string) => {
   console.log(`[${level}] ${message}`);
 };
 
-async function startServer() {
+export async function createApp() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
-
   app.use(express.json());
 
   // API Routes
@@ -184,16 +183,21 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!isNetlify) {
     app.use(express.static(path.join(process.cwd(), "dist")));
     app.get("*", (req, res) => {
       res.sendFile(path.join(process.cwd(), "dist", "index.html"));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    addLog("INFO", `Server running on http://localhost:${PORT}`);
-  });
+  return app;
 }
 
-startServer();
+if (process.env.NODE_ENV !== 'test' && !isNetlify) {
+  createApp().then(app => {
+    const PORT = Number(process.env.PORT) || 3000;
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[INFO] Server running on http://localhost:${PORT}`);
+    });
+  });
+}
