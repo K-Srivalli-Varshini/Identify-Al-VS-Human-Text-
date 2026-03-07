@@ -27,7 +27,9 @@ import {
   ShieldCheck,
   Minimize2,
   Maximize2,
-  X
+  X,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -73,6 +75,7 @@ export default function App() {
 
   const [activePipelineStep, setActivePipelineStep] = useState(0);
   const [isVisualizing, setIsVisualizing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const pipelineSteps = [
     { title: 'User Interface', desc: 'Capturing raw user input and preparing for transmission.', icon: <Monitor size={20} /> },
@@ -261,6 +264,22 @@ export default function App() {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleCopyResult = () => {
+    if (!lastResult) return;
+    
+    let textToCopy = '';
+    if (lastResult.segments) {
+      textToCopy = lastResult.segments.map(s => s.text).join(' ');
+    } else {
+      textToCopy = inputText;
+    }
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const handleDeleteHistory = async (id: number) => {
@@ -602,9 +621,18 @@ export default function App() {
                   >
                     {/* Highlighted Text */}
                     <div className="lg:col-span-2 bg-white rounded-[2rem] p-8 border border-slate-200 shadow-xl space-y-6">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="text-emerald-500" size={20} />
-                        <h3 className="font-bold text-slate-800">Forensic Highlights</h3>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="text-emerald-500" size={20} />
+                          <h3 className="font-bold text-slate-800">Forensic Highlights</h3>
+                        </div>
+                        <button 
+                          onClick={handleCopyResult}
+                          className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition-all"
+                        >
+                          {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                          {copied ? 'Copied!' : 'Copy Result'}
+                        </button>
                       </div>
                       <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 min-h-[200px] text-sm leading-relaxed text-slate-700">
                         {lastResult.segments ? (
