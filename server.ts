@@ -8,8 +8,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const isNetlify = !!process.env.NETLIFY;
-const dbPath = isNetlify ? ":memory:" : path.join(__dirname, "history.db");
+const isNetlify = !!process.env.NETLIFY || !!process.env.LAMBDA_TASK_ROOT;
+console.log(`[DEBUG] Environment: NODE_ENV=${process.env.NODE_ENV}, isNetlify=${isNetlify}`);
+const dbPath = isNetlify ? ":memory:" : path.join(process.cwd(), "history.db");
 const db = new Database(dbPath);
 
 // Initialize Database
@@ -41,6 +42,10 @@ export async function createApp() {
   app.use(express.json());
 
   // API Routes
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", environment: process.env.NODE_ENV, isNetlify });
+  });
+
   app.get("/api/history", (req, res) => {
     const history = db.prepare("SELECT * FROM history ORDER BY timestamp DESC").all();
     res.json(history);
@@ -65,6 +70,8 @@ export async function createApp() {
   });
 
   app.post("/api/analyze", async (req, res) => {
+    console.log(`[DEBUG] POST /api/analyze received at ${new Date().toISOString()}`);
+    console.log(`[DEBUG] Body keys: ${Object.keys(req.body || {})}`);
     const { text, model } = req.body;
     
     if (!text) {

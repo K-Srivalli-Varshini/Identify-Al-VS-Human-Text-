@@ -185,10 +185,32 @@ export default function App() {
     }
   };
 
+  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  const checkApiHealth = async () => {
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        const data = await res.json();
+        setApiStatus('online');
+        console.log('API Online:', data);
+      } else {
+        setApiStatus('offline');
+      }
+    } catch (err) {
+      setApiStatus('offline');
+      console.error('API Health Check Failed:', err);
+    }
+  };
+
   useEffect(() => {
     fetchHistory();
     fetchLogs();
-    const interval = setInterval(fetchLogs, 5000);
+    checkApiHealth();
+    const interval = setInterval(() => {
+      fetchLogs();
+      checkApiHealth();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -225,6 +247,9 @@ export default function App() {
       } else {
         const textResponse = await res.text();
         console.error('Non-JSON response received:', textResponse);
+        if (textResponse.includes('<!DOCTYPE html>') || textResponse.includes('<html')) {
+          throw new Error(`Server returned HTML instead of JSON (404/500). This usually means the API route is missing or the server is misconfigured. Status: ${res.status}`);
+        }
         throw new Error(`Server returned non-JSON response (${res.status}). Check logs for details.`);
       }
 
@@ -472,8 +497,13 @@ export default function App() {
               </button>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-              <Database size={16} className="text-indigo-500" />
-              <span className="text-xs font-bold text-slate-600">v2.4.0-stable</span>
+              <div className={`w-2 h-2 rounded-full ${
+                apiStatus === 'online' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 
+                apiStatus === 'checking' ? 'bg-amber-500 animate-pulse' : 'bg-rose-500'
+              }`} />
+              <span className="text-xs font-bold text-slate-600">
+                API {apiStatus === 'online' ? 'Connected' : apiStatus === 'checking' ? 'Connecting...' : 'Disconnected'}
+              </span>
             </div>
           </div>
         </header>
